@@ -1,3 +1,4 @@
+using System.Text.Json;
 public class NGramModel
 {
     private float[][] _probs;
@@ -42,5 +43,41 @@ public class NGramModel
         int last = context[context.Length-1];
 
         return _probs[last];
+    }
+
+    public NGramPayloadMapper GetPayloadForCheckpoint()
+    {
+        NGramPayloadMapper _container = new NGramPayloadMapper()
+        {
+            BigramProbs = _probs
+        };
+
+        return _container;
+    }
+
+    public void FromPayload(JsonElement payload)
+    {
+        JsonElement probsArray = payload.GetProperty("BigramProbs");
+
+        int vocabSize = probsArray.GetArrayLength();
+
+        _probs = new float[vocabSize][];
+
+        int i = 0;
+
+        foreach(JsonElement rowElement in probsArray.EnumerateArray())
+        {
+            int rowLength = rowElement.GetArrayLength();
+            _probs[i] = new float[rowLength];
+
+            int j = 0;
+
+            foreach(JsonElement colElement in rowElement.EnumerateArray())
+            {
+                _probs[i][j] = colElement.GetSingle();
+                j++;
+            }
+            i++;
+        }
     }
 }

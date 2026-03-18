@@ -1,4 +1,6 @@
-﻿namespace NGram;
+﻿using System.Text.Json;
+
+namespace NGram;
 public class TrigramModel
 {
     private Dictionary<(int, int), float[]> _trigramProbs { get; set; }
@@ -72,5 +74,48 @@ public class TrigramModel
 
         int last = context[context.Length - 1];
         return _bigramProbs[last];
+    }
+
+    public NGramPayloadMapper GetPayloadForCheckpoint()
+    {
+        List<TrigramEntry> list = new List<TrigramEntry>();
+
+        foreach(var item in _trigramProbs)
+        {
+            TrigramEntry entry = new TrigramEntry();
+
+            entry.Prev2 = item.Key.Item1;
+            entry.Prev1 = item.Key.Item2;
+            entry.NextTokenScores = item.Value;
+
+            list.Add(entry);
+        }
+
+        return new NGramPayloadMapper
+        {
+            BigramProbs = _bigramProbs,
+            TrigramProbs = list
+        };
+    }
+
+    public void FromPayload(JsonElement payload)
+    {
+        NGramPayloadMapper data = payload.Deserialize<NGramPayloadMapper>();
+
+        if(data.BigramProbs != null)
+        {
+            _bigramProbs = data.BigramProbs;
+        }
+
+        if(data.TrigramProbs != null)
+        {
+            _trigramProbs.Clear();
+
+            foreach(var entry in data.TrigramProbs)
+            {
+                (int, int) key = (entry.Prev2, entry.Prev1);
+                _trigramProbs[key] = entry.NextTokenScores;
+            }
+        }
     }
 }
