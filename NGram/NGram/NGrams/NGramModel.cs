@@ -17,6 +17,7 @@ public class NGramModel
 
     public void Train(ReadOnlySpan<int> tokens)
     {
+        _counts = new NGramCounts(_probs.Length);
         _counts.CountBigrams(tokens);
 
         for(int i = 0; i < _probs.Length; i++)
@@ -37,12 +38,19 @@ public class NGramModel
     {
         if(context.IsEmpty)
         {
-            return new float[_probs.Length];
+            float[] uniform = new float[_probs.Length];
+            for(int k = 0; k < uniform.Length; k++) {
+                uniform[k] = 1f / _probs.Length;
+            }
+            return uniform;
         }
 
         int last = context[context.Length-1];
 
-        return _probs[last];
+        float[] copy = new float[_probs[last].Length];
+        Array.Copy(_probs[last], copy, copy.Length);
+
+        return copy;
     }
 
     public NGramPayloadMapper GetPayloadForCheckpoint()

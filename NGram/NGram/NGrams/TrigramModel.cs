@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 
 namespace NGram;
 public class TrigramModel
@@ -21,6 +21,9 @@ public class TrigramModel
 
     public void Train(ReadOnlySpan<int> tokens)
     {
+        _counts = new NGramCounts(_bigramProbs.Length);
+        _trigramProbs.Clear();
+
         _counts.CountTrigrams(tokens);
         _counts.CountBigrams(tokens);
 
@@ -37,18 +40,22 @@ public class TrigramModel
             }
         }
 
-        foreach (var item in _counts.trigramCounts)
+        foreach (var item in _counts.TrigramCounts)
         {
             float rowSum = item.Value.Sum();
 
             if (rowSum > 0)
             {
-                float[] normalized = new float[item.Value.Length];
+                if (!_trigramProbs.TryGetValue(item.Key, out float[] normalized))
+                {
+                    normalized = new float[item.Value.Length];
+                    _trigramProbs[item.Key] = normalized;
+                }
+
                 for (int i = 0; i < item.Value.Length; i++)
                 {
                     normalized[i] = item.Value[i] / rowSum;
                 }
-                _trigramProbs[item.Key] = normalized;
             }
         }
     }
@@ -57,7 +64,11 @@ public class TrigramModel
     {
         if (context.IsEmpty)
         {
-            return new float[_bigramProbs.Length];
+            float[] uniform = new float[_bigramProbs.Length];
+            for(int k = 0; k < uniform.Length; k++) {
+                uniform[k] = 1f / _bigramProbs.Length;
+            }
+            return uniform;
         }
 
         if (context.Length >= 2)
@@ -68,12 +79,17 @@ public class TrigramModel
 
             if (_trigramProbs.TryGetValue(key, out float[] trigramScores))
             {
-                return trigramScores;
+                float[] copy = new float[trigramScores.Length];
+                Array.Copy(trigramScores, copy, copy.Length);
+                return copy;
             }
         }
 
         int last = context[context.Length - 1];
-        return _bigramProbs[last];
+        float[] fallbackCopy = new float[_bigramProbs[last].Length];
+        Array.Copy(_bigramProbs[last], fallbackCopy, fallbackCopy.Length);
+        
+        return fallbackCopy;
     }
 
     public NGramPayloadMapper GetPayloadForCheckpoint()
